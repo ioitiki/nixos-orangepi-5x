@@ -1,8 +1,18 @@
 {
   description = "NixOS Installer AArch64";
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  inputs = rec {
+    # panfost doesn't update lately, we have to stick with mesa 23.0 to avoid build error
+    # kernel & u-boot also stick with this revision to avoid rebuild (they are taking too long to build)
+    nixpkgs-fixed.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+
+    # the rest, we can start using newer version, they are on nix cache already
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11-small";
+
+    home-manager = {
+      url = "github:nix-community/home-manager/release-23.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     mesa-panfork = {
       url = "gitlab:panfork/mesa/csf";
@@ -15,11 +25,13 @@
     };
   };
 
-  outputs = inputs@{ nixpkgs, ... }:
+  outputs = inputs@{ nixpkgs-fixed, nixpkgs, home-manager, ... }:
     let
       user = "dao";
 
       pkgs = import nixpkgs { system = "aarch64-linux"; };
+      pkgs-fixed = import nixpkgs-fixed { system = "aarch64-linux"; };
+
       rkbin = pkgs.stdenvNoCC.mkDerivation {
         pname = "rkbin";
         version = "unstable-b4558da";
@@ -38,7 +50,7 @@
         '';
       };
 
-      u-boot = pkgs.stdenv.mkDerivation rec {
+      u-boot = pkgs-fixed.stdenv.mkDerivation rec {
         pname = "u-boot";
         version = "v2023.07.02";
 
@@ -113,7 +125,7 @@
 
 
       buildConfig = { pkgs, lib, ... }: {
-        boot.kernelPackages = pkgs.linuxPackagesFor (pkgs.callPackage ./board/kernel {
+        boot.kernelPackages = pkgs-fixed.linuxPackagesFor (pkgs-fixed.callPackage ./board/kernel {
           src = inputs.linux-rockchip;
         });
 
@@ -133,7 +145,7 @@
           opengl = {
             enable = true;
             package = lib.mkForce (
-              (pkgs.mesa.override {
+              (pkgs-fixed.mesa.override {
                 galliumDrivers = [ "panfrost" "swrast" ];
                 vulkanDrivers = [ "swrast" ];
               }).overrideAttrs (_: {
@@ -142,7 +154,7 @@
                 src = inputs.mesa-panfork;
               })
             ).drivers;
-	    extraPackages = [ rk-valhal ];
+	    # extraPackages = [ rk-valhal ];
           };
 
           firmware = [ (pkgs.callPackage ./board/firmware { }) ];
@@ -170,6 +182,9 @@
           wdisplays
           wofi
 	  gnome.adwaita-icon-theme
+	  xst
+
+	  taskwarrior
         ];
 
         environment.loginShellInit = ''
@@ -194,12 +209,12 @@
 
 	  hyprland.enable = true;
 
-	  starship.enable = true;
+	  # starship.enable = true;
 	  neovim.enable = true;
 	  neovim.defaultEditor = true;
 	};
 
-        system.stateVersion = "23.05";
+        system.stateVersion = "23.11";
       };
     in
     rec
@@ -328,8 +343,8 @@
         system = "aarch64-linux";
         modules = [
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
-          ({ pkgs, lib, ... }:
-            {
+          ({ pkgs, lib, ... }: {
+
               boot = {
                 loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
                 initrd.luks.devices."Encrypted".device = "/dev/disk/by-partlabel/Encrypted";
@@ -357,15 +372,20 @@
                 initialPassword = "${user}";
                 extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
                 packages = with pkgs; [
+		  home-manager
+
                   neofetch
                   pavucontrol
 		  direnv
 		  dunst
-		  librewolf
+		  firefox
+		  chromium
+		  qemu
                 ];
               };
 
 	      services.getty.autologinUser = "${user}";
+	      services.sshd.enable = true;
 
               nix = {
                 settings = {
@@ -386,6 +406,16 @@
                 '';
               };
             })
+
+	    home-manager.nixosModules.home-manager {
+	      home-manager.users.${user} = { pkgs, ... }: {
+	        home.packages = with pkgs; [ 
+	          ftop
+	        ];
+	        programs.bash.enable = true;
+	        home.stateVersion = "23.11";
+	     };
+	   }
         ];
       };
 
