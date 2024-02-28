@@ -7,7 +7,7 @@
     nixpkgs-fixed.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
     # the rest, we can start using newer version, they are on nix cache already
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11-small";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
 
     home-manager = {
       url = "github:nix-community/home-manager/release-23.11";
@@ -154,7 +154,7 @@
                 src = inputs.mesa-panfork;
               })
             ).drivers;
-	    # extraPackages = [ rk-valhal ];
+	    extraPackages = [ rk-valhal ];
           };
 
           firmware = [ (pkgs.callPackage ./board/firmware { }) ];
@@ -183,20 +183,21 @@
           wofi
 	  gnome.adwaita-icon-theme
 	  xst
+	  rofi
 
 	  taskwarrior
         ];
 
         environment.loginShellInit = ''
           # https://wiki.archlinux.org/title/Sway
-	  export GDK_BACKEND=wayland
-          export MOZ_ENABLE_WAYLAND=1
-	  export QT_QPA_PLATFORM=wayland
-	  export XDG_SESSION_TYPE=wayland
+	  # export GDK_BACKEND=wayland
+          # export MOZ_ENABLE_WAYLAND=1
+	  # export QT_QPA_PLATFORM=wayland
+	  # export XDG_SESSION_TYPE=wayland
 
           if [ -z "$WAYLAND_DISPLAY" ] && [ "_$XDG_VTNR" == "_1" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
 	    dunst&
-            exec ${pkgs.swayfx}/bin/sway
+            # exec ${pkgs.swayfx}/bin/sway
           fi
 
 	  alias e=nvim
@@ -386,6 +387,11 @@
 
 	      services.getty.autologinUser = "${user}";
 	      services.sshd.enable = true;
+
+	      services.xserver.enable = true;
+	      services.xserver.videoDrivers = [ "modesetting" ];
+	      services.xserver.displayManager.startx.enable = true;
+	      services.xserver.windowManager.spectrwm.enable = true;
 
               nix = {
                 settings = {
