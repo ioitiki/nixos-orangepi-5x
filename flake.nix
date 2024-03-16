@@ -1,3 +1,4 @@
+# vim: tabstop=2 expandtab autoindent
 {
   description = "NixOS Installer AArch64";
 
@@ -7,10 +8,10 @@
     nixpkgs-fixed.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
     # the rest, we can start using newer version, they are on nix cache already
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-23.11";
+      url = "github:nix-community/home-manager/release-23.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -100,12 +101,13 @@
         '';
       };
 
-      rk-valhal = pkgs.runCommand "" {
-	src = pkgs.fetchurl {
-	  url = "https://github.com/JeffyCN/mirrors/raw/libmali/lib/aarch64-linux-gnu/libmali-valhall-g610-g6p0-x11-wayland-gbm.so";
-	  sha256 = "0yzwlc1mm7adqv804jqm2ikkn1ji0pv1fpxjb9xxw69r2wbmlhkl";
-	};
-      } ''
+      rk-valhal = pkgs.runCommand ""
+        {
+          src = pkgs.fetchurl {
+            url = "https://github.com/JeffyCN/mirrors/raw/libmali/lib/aarch64-linux-gnu/libmali-valhall-g610-g6p0-x11-wayland-gbm.so";
+            sha256 = "0yzwlc1mm7adqv804jqm2ikkn1ji0pv1fpxjb9xxw69r2wbmlhkl";
+          };
+        } ''
         mkdir $out/lib -p
         cp $src $out/lib/libmali.so.1
         ln -s libmali.so.1 $out/lib/libmali-valhall-g610-g6p0-x11-wayland-gbm.so
@@ -122,7 +124,6 @@
           tar czf $out *
         '';
       };
-
 
       buildConfig = { pkgs, lib, ... }: {
         boot.kernelPackages = pkgs-fixed.linuxPackagesFor (pkgs-fixed.callPackage ./board/kernel {
@@ -154,7 +155,7 @@
                 src = inputs.mesa-panfork;
               })
             ).drivers;
-	    extraPackages = [ rk-valhal ];
+            # extraPackages = [ rk-valhal ];
           };
 
           firmware = [ (pkgs.callPackage ./board/firmware { }) ];
@@ -177,45 +178,48 @@
           waybar
           swaylock
           swayidle
-	  swayfx
+          swayfx
           foot
           wdisplays
           wofi
-	  gnome.adwaita-icon-theme
-	  xst
-	  rofi
+          gnome.adwaita-icon-theme
+          xst
+          rofi
+          ripgrep
+          fzf
 
-	  taskwarrior
+          taskwarrior
         ];
 
         environment.loginShellInit = ''
           # https://wiki.archlinux.org/title/Sway
-	  # export GDK_BACKEND=wayland
+          # export GDK_BACKEND=wayland
           # export MOZ_ENABLE_WAYLAND=1
-	  # export QT_QPA_PLATFORM=wayland
-	  # export XDG_SESSION_TYPE=wayland
+          # export QT_QPA_PLATFORM=wayland
+          # export XDG_SESSION_TYPE=wayland
 
           if [ -z "$WAYLAND_DISPLAY" ] && [ "_$XDG_VTNR" == "_1" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
-	    dunst&
+          dunst&
+          startx
             # exec ${pkgs.swayfx}/bin/sway
           fi
 
-	  alias e=nvim
-	  alias rebuild='sudo nixos-rebuild switch --flake .'
+          alias e=nvim
+          alias rebuild='sudo nixos-rebuild switch --flake .'
         '';
 
         programs = {
-	  sway.enable = true;
-	  sway.package = null;
+          sway.enable = true;
+          sway.package = null;
 
-	  hyprland.enable = true;
+          hyprland.enable = true;
 
-	  # starship.enable = true;
-	  neovim.enable = true;
-	  neovim.defaultEditor = true;
-	};
+          # starship.enable = true;
+          neovim.enable = true;
+          neovim.defaultEditor = true;
+        };
 
-        system.stateVersion = "23.11";
+        system.stateVersion = "23.05";
       };
     in
     rec
@@ -346,82 +350,110 @@
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
           ({ pkgs, lib, ... }: {
 
-              boot = {
-                loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
-                initrd.luks.devices."Encrypted".device = "/dev/disk/by-partlabel/Encrypted";
-                initrd.availableKernelModules = lib.mkForce [ "dm_mod" "dm_crypt" "encrypted_keys" ];
+            # make sure using local cache for searching packages
+            nix.registry.nixpkgs.flake = inputs.nixpkgs;
+            nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+
+            boot = {
+              loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
+              initrd.luks.devices."Encrypted".device = "/dev/disk/by-partlabel/Encrypted";
+              initrd.availableKernelModules = lib.mkForce [ "dm_mod" "dm_crypt" "encrypted_keys" ];
+            };
+
+            fileSystems."/" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=8G" ]; };
+            fileSystems."/boot" = { device = "/dev/disk/by-partlabel/Firmwares"; fsType = "vfat"; };
+            fileSystems."/nix" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=nix,compress=zstd,noatime" ]; };
+            fileSystems."/home/${user}" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=usr,compress=zstd,noatime" ]; };
+
+            # why not, we have 16GiB RAM
+            fileSystems."/tmp" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=12G" ]; };
+
+            networking = {
+              hostName = "singoc";
+              networkmanager.enable = true;
+            };
+
+            time.timeZone = "Asia/Ho_Chi_Minh";
+            i18n.defaultLocale = "en_US.UTF-8";
+
+            users.users.${user} = {
+              isNormalUser = true;
+              initialPassword = "${user}";
+              extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
+              packages = with pkgs; [
+                home-manager
+
+                neofetch
+                pavucontrol
+                direnv
+                dunst
+                firefox
+                chromium
+                qemu
+              ];
+            };
+
+            services.getty.autologinUser = "${user}";
+            services.sshd.enable = true;
+
+            services.xserver.enable = true;
+            services.xserver.videoDrivers = [ "modesetting" ];
+            services.xserver.displayManager.startx.enable = true;
+            services.xserver.windowManager.spectrwm.enable = true;
+            # services.xserver.desktopManager.plasma5.enable = true;
+
+            nix = {
+              settings = {
+                auto-optimise-store = true;
+                experimental-features = [ "nix-command" "flakes" ];
               };
 
-              fileSystems."/" = 	{ device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=8G" ]; };
-              fileSystems."/boot" = 	{ device = "/dev/disk/by-partlabel/Firmwares"; fsType = "vfat"; };
-              fileSystems."/nix" = 	{ device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=nix,compress=zstd,noatime" ]; };
-              fileSystems."/home/${user}" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=usr,compress=zstd,noatime" ]; };
-
-              # why not, we have 16GiB RAM
-              fileSystems."/tmp" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=12G" ]; };
-
-              networking = {
-                hostName = "singoc";
-                networkmanager.enable = true;
+              gc = {
+                automatic = true;
+                dates = "weekly";
+                options = "--delete-older-than 30d";
               };
 
-              time.timeZone = "Asia/Ho_Chi_Minh";
-              i18n.defaultLocale = "en_US.UTF-8";
+              # Free up to 1GiB whenever there is less than 100MiB left.
+              extraOptions = ''
+                min-free = ${toString ( 100 * 1024 * 1024)}
+                max-free = ${toString (1024 * 1024 * 1024)}
+              '';
+            };
+          })
 
-              users.users.${user} = {
-                isNormalUser = true;
-                initialPassword = "${user}";
-                extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
-                packages = with pkgs; [
-		  home-manager
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.users.${user} = { pkgs, ... }: {
+              home.packages = with pkgs; [
+                ftop
+              ];
 
-                  neofetch
-                  pavucontrol
-		  direnv
-		  dunst
-		  firefox
-		  chromium
-		  qemu
-                ];
-              };
+              programs.bash = {
+                enable = true;
+                enableCompletion = true;
 
-	      services.getty.autologinUser = "${user}";
-	      services.sshd.enable = true;
-
-	      services.xserver.enable = true;
-	      services.xserver.videoDrivers = [ "modesetting" ];
-	      services.xserver.displayManager.startx.enable = true;
-	      services.xserver.windowManager.spectrwm.enable = true;
-
-              nix = {
-                settings = {
-                  auto-optimise-store = true;
-                  experimental-features = [ "nix-command" "flakes" ];
+                shellAliases = {
+                  hme = "${pkgs.neovim}/bin/nvim $HOME/conf/flake.nix";
+                  hmw = "sudo nixos-rebuild --switch --flake $HOME/conf";
                 };
 
-                gc = {
-                  automatic = true;
-                  dates = "weekly";
-                  options = "--delete-older-than 30d";
-                };
-
-                # Free up to 1GiB whenever there is less than 100MiB left.
-                extraOptions = ''
-                  min-free = ${toString ( 100 * 1024 * 1024)}
-                  max-free = ${toString (1024 * 1024 * 1024)}
+                bashrcExtra = ''
+                  set -o vi
                 '';
               };
-            })
 
-	    home-manager.nixosModules.home-manager {
-	      home-manager.users.${user} = { pkgs, ... }: {
-	        home.packages = with pkgs; [ 
-	          ftop
-	        ];
-	        programs.bash.enable = true;
-	        home.stateVersion = "23.11";
-	     };
-	   }
+
+              home.file = {
+                ".local/share/fonts/ocra.ttf".source = pkgs.fetchurl {
+                  url = "https://github.com/qwazix/free-libre-fonts/raw/master/OCRA/OCRA.ttf";
+                  sha256 = "sha256-oPWICXBdVBCP5BQJuucPu4MVpk6Ymq8q+gTVz7uU9U4=";
+                };
+              };
+
+              home.stateVersion = "23.05";
+            };
+          }
         ];
       };
 
@@ -431,8 +463,8 @@
       packages.aarch64-linux.sdwriter = pkgs.writeScript "flash" ''
         echo "= flash to sdcard (/dev/mmcblk1) if presented, requires sudo as well."
         [ -e /dev/mmcblk1 ] && zstdcat result/sd-image/*.zst | \
-              sudo dd of=/dev/mmcblk1 bs=8M status=progress
-	[ -e /dev/mmcblk1 ] || echo "=  no sdcard found"
+          sudo dd of=/dev/mmcblk1 bs=8M status=progress
+        [ -e /dev/mmcblk1 ] || echo "=  no sdcard found"
       '';
       apps.aarch64-linux.default = { type = "app"; program = "${packages.aarch64-linux.sdwriter}"; };
     };
