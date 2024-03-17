@@ -101,19 +101,6 @@
         '';
       };
 
-      rk-valhal = pkgs.runCommand ""
-        {
-          src = pkgs.fetchurl {
-            url = "https://github.com/JeffyCN/mirrors/raw/libmali/lib/aarch64-linux-gnu/libmali-valhall-g610-g6p0-x11-wayland-gbm.so";
-            sha256 = "0yzwlc1mm7adqv804jqm2ikkn1ji0pv1fpxjb9xxw69r2wbmlhkl";
-          };
-        } ''
-        mkdir $out/lib -p
-        cp $src $out/lib/libmali.so.1
-        ln -s libmali.so.1 $out/lib/libmali-valhall-g610-g6p0-x11-wayland-gbm.so
-        for l in libEGL.so libEGL.so.1 libgbm.so.1 libGLESv2.so libGLESv2.so.2 libOpenCL.so.1; do ln -s libmali.so.1 $out/lib/$l; done
-      '';
-
       nixos-orangepi-5x = pkgs.stdenvNoCC.mkDerivation {
         pname = "nixos-orangepi-5x";
         version = "unstable";
@@ -155,7 +142,6 @@
                 src = inputs.mesa-panfork;
               })
             ).drivers;
-            # extraPackages = [ rk-valhal ];
           };
 
           firmware = [ (pkgs.callPackage ./board/firmware { }) ];
@@ -173,15 +159,6 @@
           htop
           neofetch
 
-          # only wayland can utily GPU as of now
-          wayland
-          waybar
-          swaylock
-          swayidle
-          swayfx
-          foot
-          wdisplays
-          wofi
           gnome.adwaita-icon-theme
           xst
           rofi
@@ -192,16 +169,9 @@
         ];
 
         environment.loginShellInit = ''
-          # https://wiki.archlinux.org/title/Sway
-          # export GDK_BACKEND=wayland
-          # export MOZ_ENABLE_WAYLAND=1
-          # export QT_QPA_PLATFORM=wayland
-          # export XDG_SESSION_TYPE=wayland
-
-          if [ -z "$WAYLAND_DISPLAY" ] && [ "_$XDG_VTNR" == "_1" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
-          dunst&
-          startx
-            # exec ${pkgs.swayfx}/bin/sway
+          if [ -z "$DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
+            dunst&
+            startx
           fi
 
           alias e=nvim
@@ -209,11 +179,6 @@
         '';
 
         programs = {
-          sway.enable = true;
-          sway.package = null;
-
-          hyprland.enable = true;
-
           # starship.enable = true;
           neovim.enable = true;
           neovim.defaultEditor = true;
@@ -395,12 +360,23 @@
 
             services.getty.autologinUser = "${user}";
             services.sshd.enable = true;
+            services.fstrim = { enable = true; };
 
-            services.xserver.enable = true;
-            services.xserver.videoDrivers = [ "modesetting" ];
-            services.xserver.displayManager.startx.enable = true;
-            services.xserver.windowManager.spectrwm.enable = true;
-            # services.xserver.desktopManager.plasma5.enable = true;
+            services.xserver = {
+              enable = true;
+              videoDrivers = [ "modesetting" ];
+              displayManager.startx.enable = true;
+              windowManager.spectrwm.enable = true;
+            };
+            services.cockpit = {
+              enable = true;
+              port = 9090;
+              settings = {
+                WebService = {
+                  AllowUnencrypted = true;
+                };
+              };
+            };
 
             nix = {
               settings = {
@@ -411,7 +387,7 @@
               gc = {
                 automatic = true;
                 dates = "weekly";
-                options = "--delete-older-than 30d";
+                options = "--delete-older-than 10d";
               };
 
               # Free up to 1GiB whenever there is less than 100MiB left.
@@ -448,6 +424,20 @@
                 ".local/share/fonts/ocra.ttf".source = pkgs.fetchurl {
                   url = "https://github.com/qwazix/free-libre-fonts/raw/master/OCRA/OCRA.ttf";
                   sha256 = "sha256-oPWICXBdVBCP5BQJuucPu4MVpk6Ymq8q+gTVz7uU9U4=";
+                };
+
+                ".local/share/fonts/latin-modern-mono".source = pkgs.fetchzip {
+                  url = "https://www.fontsquirrel.com/fonts/download/Latin-Modern-Mono";
+                  extension = ".zip";
+                  stripRoot = false;
+                  sha256 = "sha256-Td//b/M9IafhG2jtHLfvfTWdqyLtMr/jBizZAeBRPwM=";
+                };
+
+                ".local/share/fonts/mplus-1m".source = pkgs.fetchzip {
+                  url = "https://www.fontsquirrel.com/fonts/download/M-1m";
+                  extension = ".zip";
+                  stripRoot = false;
+                  sha256 = "sha256-zpZ1B4x756FKuAJOazggN3UQUgW3zji95533WbiU/Lw=";
                 };
               };
 
