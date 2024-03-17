@@ -30,7 +30,37 @@
     let
       user = "dao";
 
-      pkgs = import nixpkgs { system = "aarch64-linux"; };
+      pkgs = import nixpkgs {
+        system = "aarch64-linux";
+        overlays = [
+          (self: super: {
+            ccacheWrapper = super.ccacheWrapper.override {
+              extraConfig = ''
+                export CCACHE_COMPRESS=1
+                export CCACHE_DIR="/nix/var/cache/ccache"
+                export CCACHE_UMASK=007
+                if [ ! -d "$CCACHE_DIR" ]; then
+                  echo "====="
+                  echo "Directory '$CCACHE_DIR' does not exist"
+                  echo "Please create it with:"
+                  echo "  sudo mkdir -m0770 '$CCACHE_DIR'"
+                  echo "  sudo chown root:nixbld '$CCACHE_DIR'"
+                  echo "====="
+                  exit 1
+                fi
+                if [ ! -w "$CCACHE_DIR" ]; then
+                  echo "====="
+                  echo "Directory '$CCACHE_DIR' is not accessible for user $(whoami)"
+                  echo "Please verify its access permissions"
+                  echo "====="
+                  exit 1
+                fi
+              '';
+            };
+          })
+        ];
+      };
+
       pkgs-fixed = import nixpkgs-fixed { system = "aarch64-linux"; };
 
       rkbin = pkgs.stdenvNoCC.mkDerivation {
@@ -51,7 +81,7 @@
         '';
       };
 
-      u-boot = pkgs-fixed.stdenv.mkDerivation rec {
+      u-boot = pkgs.ccacheStdenv.mkDerivation rec {
         pname = "u-boot";
         version = "v2023.07.02";
 
@@ -112,9 +142,10 @@
         '';
       };
 
-      buildConfig = { pkgs, lib, ... }: {
-        boot.kernelPackages = pkgs-fixed.linuxPackagesFor (pkgs-fixed.callPackage ./board/kernel {
+      buildConfig = { pkgs, lib, ... }: rec {
+        boot.kernelPackages = pkgs.linuxPackagesFor (pkgs.callPackage ./board/kernel {
           src = inputs.linux-rockchip;
+          inherit pkgs;
         });
 
         # most of required modules had been builtin
@@ -133,9 +164,10 @@
           opengl = {
             enable = true;
             package = lib.mkForce (
-              (pkgs-fixed.mesa.override {
+              (pkgs.mesa.override {
                 galliumDrivers = [ "panfrost" "swrast" ];
                 vulkanDrivers = [ "swrast" ];
+                stdenv = pkgs.ccacheStdenv;
               }).overrideAttrs (_: {
                 pname = "mesa-panfork";
                 version = "23.0.0-panfork";
@@ -166,7 +198,7 @@
           fzf
 
           taskwarrior
-        ];
+        ] ++ [ u-boot ];
 
         environment.loginShellInit = ''
           if [ -z "$DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
@@ -182,7 +214,10 @@
           # starship.enable = true;
           neovim.enable = true;
           neovim.defaultEditor = true;
+          ccache.enable = true;
+          ccache.packageNames = [ "linux" ];
         };
+        nix.settings.extra-sandbox-paths = [ "/nix/var/cache/ccache" ];
 
         system.stateVersion = "23.05";
       };
@@ -311,6 +346,7 @@
       # to install NixOS on eMMC
       nixosConfigurations.singoc = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
+
         modules = [
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
           ({ pkgs, lib, ... }: {

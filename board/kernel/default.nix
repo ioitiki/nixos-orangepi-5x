@@ -1,9 +1,10 @@
-{ src
+{ pkgs
+, src
 , linuxManualConfig
 , ubootTools
 , ...
 }:
-(linuxManualConfig {
+((linuxManualConfig {
   version = "5.10.160-rockchip-rk3588";
   modDirVersion = "5.10.160";
 
@@ -14,7 +15,7 @@
   extraMeta.branch = "5.10";
 
   allowImportFromDerivation = true;
-}).overrideAttrs (old: {
+}).override { stdenv = pkgs.ccacheStdenv; }).overrideAttrs (old: {
   name = "k"; # dodge uboot length limits
   nativeBuildInputs = old.nativeBuildInputs ++ [ ubootTools ];
 })
