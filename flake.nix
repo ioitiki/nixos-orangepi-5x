@@ -17,7 +17,7 @@
     };
 
     linux-rockchip = {
-      url = "github:armbian/linux-rockchip/rk-5.10-rkr5.1";
+      url = "github:orangepi-xunlong/linux-orangepi/orange-pi-6.1-rk35xx";
       flake = false;
     };
   };

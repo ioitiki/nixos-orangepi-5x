@@ -5,14 +5,14 @@
 , ...
 }:
 ((linuxManualConfig {
-  version = "5.10.160-rockchip-rk3588";
-  modDirVersion = "5.10.160";
+  version = "6.1.43-rk3588s";
+  modDirVersion = "6.1.43";
 
   inherit src;
 
-  configfile = ./orangepi5_config;
+  configfile = ./defconfig;
 
-  extraMeta.branch = "5.10";
+  extraMeta.branch = "6.1";
 
   allowImportFromDerivation = true;
 }).override { stdenv = pkgs.ccacheStdenv; }).overrideAttrs (old: {

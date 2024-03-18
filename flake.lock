@@ -24,17 +24,17 @@
     "linux-rockchip": {
       "flake": false,
       "locked": {
-        "lastModified": 1695823120,
-        "narHash": "sha256-YCCyPHBkL48mJGU/WhnMEzptiZc2EujjuDXOMz4lZ8I=",
-        "owner": "armbian",
-        "repo": "linux-rockchip",
-        "rev": "f27702096f0c9b2b4aa423e492db6369fc0fe979",
+        "lastModified": 1706939840,
+        "narHash": "sha256-tVu/3SF/+s+Z6ytKvuY+ZwqsXUlm40yOZ/O5kfNfUYc=",
+        "owner": "orangepi-xunlong",
+        "repo": "linux-orangepi",
+        "rev": "752c0d0a12fdce201da45852287b48382caa8c0f",
         "type": "github"
       },
       "original": {
-        "owner": "armbian",
-        "ref": "rk-5.10-rkr5.1",
-        "repo": "linux-rockchip",
+        "owner": "orangepi-xunlong",
+        "ref": "orange-pi-6.1-rk35xx",
+        "repo": "linux-orangepi",
         "type": "github"
       }
     },
