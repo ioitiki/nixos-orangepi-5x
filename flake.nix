@@ -3,10 +3,6 @@
   description = "NixOS Installer AArch64";
 
   inputs = rec {
-    # panfost doesn't update lately, we have to stick with mesa 23.0 to avoid build error
-    # kernel & u-boot also stick with this revision to avoid rebuild (they are taking too long to build)
-    nixpkgs-fixed.url = "github:NixOS/nixpkgs/nixos-23.05-small";
-
     # the rest, we can start using newer version, they are on nix cache already
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
@@ -26,7 +22,7 @@
     };
   };
 
-  outputs = inputs@{ nixpkgs-fixed, nixpkgs, home-manager, ... }:
+  outputs = inputs@{ nixpkgs, home-manager, ... }:
     let
       user = "dao";
 
@@ -60,8 +56,6 @@
           })
         ];
       };
-
-      pkgs-fixed = import nixpkgs-fixed { system = "aarch64-linux"; };
 
       rkbin = pkgs.stdenvNoCC.mkDerivation {
         pname = "rkbin";
@@ -138,7 +132,8 @@
         src = ./.;
 
         installPhase = ''
-          tar czf $out *
+          mkdir $out
+          tar czf $out/meta.tar.gz *
         '';
       };
 
@@ -210,6 +205,48 @@
           alias rebuild='sudo nixos-rebuild switch --flake .'
         '';
 
+        time.timeZone = "Asia/Ho_Chi_Minh";
+        i18n.defaultLocale = "en_US.UTF-8";
+
+        services.sshd.enable = true;
+        services.fstrim = { enable = true; };
+
+        services.xserver = {
+          enable = true;
+          videoDrivers = [ "modesetting" ];
+          displayManager.startx.enable = true;
+          windowManager.spectrwm.enable = true;
+        };
+
+        services.cockpit = {
+          enable = true;
+          port = 9090;
+          settings = {
+            WebService = {
+              AllowUnencrypted = true;
+            };
+          };
+        };
+
+        nix = {
+          settings = {
+            auto-optimise-store = true;
+            experimental-features = [ "nix-command" "flakes" ];
+          };
+
+          gc = {
+            automatic = true;
+            dates = "weekly";
+            options = "--delete-older-than 10d";
+          };
+
+          # Free up to 1GiB whenever there is less than 100MiB left.
+          extraOptions = ''
+            min-free = ${toString ( 100 * 1024 * 1024)}
+            max-free = ${toString (1024 * 1024 * 1024)}
+          '';
+        };
+
         programs = {
           # starship.enable = true;
           neovim.enable = true;
@@ -217,7 +254,11 @@
           ccache.enable = true;
           ccache.packageNames = [ "linux" ];
         };
+
         nix.settings.extra-sandbox-paths = [ "/nix/var/cache/ccache" ];
+        # make sure using local cache for searching packages
+        nix.registry.nixpkgs.flake = inputs.nixpkgs;
+        nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
 
         system.stateVersion = "23.05";
       };
@@ -229,7 +270,9 @@
         system = "aarch64-linux";
         modules = [
           "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64-installer.nix"
+
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
+
           ({ pkgs, lib, ... }: {
             # all modules we need are builtin already, the nixos default profile might add
             # some which is not available, force to not use any other.
@@ -241,82 +284,15 @@
               extraGroups = [ "networkmanager" "wheel" ];
 
               packages = [
-                # all scripts bellow run as batch, no failure check
+                u-boot
+                nixos-orangepi-5x
 
-                (pkgs.writeScriptBin "opi5b-update-firmware-2-emmc" ''
-                  set -x
-
-                  [ -f /boot/firmware/u-boot-rockchip.bin ] && \
-                    sudo dd if=/boot/firmware/u-boot-rockchip.bin of=/dev/mmcblk0 seek=64
+                (pkgs.writeScriptBin "extract-install-files" ''
+                  tmpdir=$(mktemp -d)
+                  cp ${u-boot}/u-boot-rockchip.bin $tmpdir
+                  tar -xzf ${nixos-orangepi-5x}/meta.tar.gz -C $tmpdir
+                  echo "dd if=$tmpdir/u-boot-rockchip.bin of=\$1 seek=64 conv=notrunc" > $tmpdir/update-bootloader
                 '')
-
-                (pkgs.writeScriptBin "opi5b-unmount-emmc" ''
-                  set -x
-
-                  # unmount everything those leftover
-                  mount | awk '/mmcblk0|dev\/mapper|Firmwares|Encrypted|mnt/{print $1}' | xargs umount > /dev/null 2>&1
-                '')
-
-                (pkgs.writeScriptBin "opi5b-format-emmc" ''
-                  set -x
-
-                  # unmount everything those leftover
-                  opi5-unmount-emmc
-                  ${pkgs.cryptsetup}/bin/cryptsetup luksClose /dev/disk/by-partlabel/Encrypted > /dev/null 2>&1
-
-                  # create partition table
-                  ${pkgs.parted}/bin/parted -s /dev/mmcblk0 -- mktable gpt
-                  ${pkgs.parted}/bin/parted -s /dev/mmcblk0 -- mkpart Firmwares fat32 16MiB 512MiB
-                  ${pkgs.parted}/bin/parted -s /dev/mmcblk0 -- mkpart Encrypted btrfs 512MiB 100%
-                  ${pkgs.parted}/bin/parted -s /dev/mmcblk0 -- set 1 boot on
-                  ${pkgs.parted}/bin/parted -s /dev/mmcblk0 -- print
-
-                  # format the boot partition in advanced
-                  mkfs.vfat -F32 /dev/mmcblk0p1
-
-                  # expect crypt device not yet openned or mounted
-                  ${pkgs.cryptsetup}/bin/cryptsetup luksFormat /dev/disk/by-partlabel/Encrypted
-                  ${pkgs.cryptsetup}/bin/cryptsetup luksOpen /dev/disk/by-partlabel/Encrypted Encrypted
-
-                  # format partition and create subvolumes
-                  mkfs.btrfs /dev/mapper/Encrypted
-                  mkdir -p /mnt && mount /dev/mapper/Encrypted /mnt
-                  btrfs subvolume create /mnt/nix
-                  btrfs subvolume create /mnt/usr
-                  umount /mnt
-                '')
-
-                (pkgs.writeScriptBin "opi5b-mount-root" ''
-                  set -x
-
-                  # nerds might repeatly run over and over
-                  opi5-unmount-emmc
-
-                  # where is the root?
-                  mkdir -p /mnt
-                  mount -t tmpfs -o size=8G,mode=755 none /mnt
-
-                  # create the archors
-                  mkdir -p /mnt/{boot,nix}
-                  mount -t btrfs -o subvol=nix,compress=zstd,noatime /mnt/nix
-                  mount /dev/disk/by-partlabel/Firmwares /mnt/boot
-
-                  # final check before hangout
-                  mount
-                '')
-
-                (pkgs.writeScriptBin "opi5b-install-2-emmc" ''
-                  set -x
-
-                  tmp=$(mktemp -d)
-
-                  # we are trying to customize the flake, let not try copy
-                  [ -f $PWD/flake.nix ] && tmp=$PWD
-                  [ -f $tmp/flake.nix ] || tar xf firmware/nixos-orangepi-5x.tar.gz -C $tmp
-
-                  [ -f $tmp/flake.nix ] && nix build $tmp/flake.nix#singoc
-                '')
-
               ];
             };
 
@@ -336,7 +312,7 @@
               # to write to eMMC
               postBuildCommands = ''
                 cp ${u-boot}/u-boot-rockchip.bin firmware/
-                cp ${nixos-orangepi-5x} firmware/nixos-orangepi-5x.tar.gz
+                cp ${nixos-orangepi-5x}/meta.tar.gz firmware/nixos-orangepi-5x.tar.gz
               '';
             };
           })
@@ -350,10 +326,6 @@
         modules = [
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
           ({ pkgs, lib, ... }: {
-
-            # make sure using local cache for searching packages
-            nix.registry.nixpkgs.flake = inputs.nixpkgs;
-            nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
 
             boot = {
               loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
@@ -374,9 +346,6 @@
               networkmanager.enable = true;
             };
 
-            time.timeZone = "Asia/Ho_Chi_Minh";
-            i18n.defaultLocale = "en_US.UTF-8";
-
             users.users.${user} = {
               isNormalUser = true;
               initialPassword = "${user}";
@@ -393,51 +362,16 @@
                 qemu
               ];
             };
-
             services.getty.autologinUser = "${user}";
-            services.sshd.enable = true;
-            services.fstrim = { enable = true; };
-
-            services.xserver = {
-              enable = true;
-              videoDrivers = [ "modesetting" ];
-              displayManager.startx.enable = true;
-              windowManager.spectrwm.enable = true;
-            };
-            services.cockpit = {
-              enable = true;
-              port = 9090;
-              settings = {
-                WebService = {
-                  AllowUnencrypted = true;
-                };
-              };
-            };
-
-            nix = {
-              settings = {
-                auto-optimise-store = true;
-                experimental-features = [ "nix-command" "flakes" ];
-              };
-
-              gc = {
-                automatic = true;
-                dates = "weekly";
-                options = "--delete-older-than 10d";
-              };
-
-              # Free up to 1GiB whenever there is less than 100MiB left.
-              extraOptions = ''
-                min-free = ${toString ( 100 * 1024 * 1024)}
-                max-free = ${toString (1024 * 1024 * 1024)}
-              '';
-            };
           })
 
           home-manager.nixosModules.home-manager
           {
             home-manager.users.${user} = { pkgs, ... }: {
               home.packages = with pkgs; [
+                roboto
+                roboto-mono
+
                 ftop
               ];
 
