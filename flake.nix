@@ -122,6 +122,8 @@
         installPhase = ''
           mkdir $out
           cp u-boot-rockchip.bin $out
+          cp ${rkbin}/rk3588_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin $out
+          cp ${rkbin}/rk3588_bl31_v1.40.elf $out
         '';
       };
 
@@ -195,9 +197,17 @@
           taskwarrior
         ] ++ [ u-boot ];
 
+        # save u-boot for later usage
+        environment.etc."u-boot".source = u-boot;
+
         environment.loginShellInit = ''
           if [ -z "$DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
             dunst&
+
+            # set default output to headphone
+            pacmd set-default-sink alsa_output.platform-es8388-sound.stereo-fallback &
+
+            # start the X
             startx
           fi
 
@@ -362,7 +372,12 @@
                 qemu
               ];
             };
+
             services.getty.autologinUser = "${user}";
+            services.atftpd = {
+              enable = true;
+              root = "/tmp/tftpboot";
+            };
           })
 
           home-manager.nixosModules.home-manager
@@ -371,6 +386,7 @@
               home.packages = with pkgs; [
                 roboto
                 roboto-mono
+                nerdfonts
 
                 ftop
               ];
