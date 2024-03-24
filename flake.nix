@@ -64,8 +64,8 @@
         src = pkgs.fetchFromGitHub {
           owner = "rockchip-linux";
           repo = "rkbin";
-          rev = "b4558da0860ca48bf1a571dd33ccba580b9abe23";
-          sha256 = "sha256-KUZQaQ+IZ0OynawlYGW99QGAOmOrGt2CZidI3NTxFw8=";
+          rev = "a2a0b89b6c8c612dca5ed9ed8a68db8a07f68bc0";
+          sha256 = "sha256-U/jeUsV7bhqMw3BljmO6SI07NCDAd/+sEp3dZnyXeeA=";
         };
 
         # we just need TPL and BL31 but it doesn't hurt,
@@ -77,13 +77,13 @@
 
       u-boot = pkgs.ccacheStdenv.mkDerivation rec {
         pname = "u-boot";
-        version = "v2023.07.02";
+        version = "v2024.01";
 
         src = pkgs.fetchFromGitHub {
           owner = "u-boot";
           repo = "u-boot";
           rev = "${version}";
-          sha256 = "sha256-HPBjm/rIkfTCyAKCFvCqoK7oNN9e9rV9l32qLmI/qz4=";
+          sha256 = "sha256-0Da7Czy9cpQ+D5EICc3/QSZhAdCBsmeMvBgykYhAQFw=";
         };
 
         # u-boot for evb is not enable the sdmmc node, which cause issue as
@@ -109,21 +109,21 @@
         ] ++ [ rkbin ];
 
         configurePhase = ''
-          make ARCH=arm evb-rk3588_defconfig
+          make ARCH=arm orangepi-5-rk3588s_defconfig
         '';
 
         buildPhase = ''
           patchShebangs tools scripts
           make -j$(nproc) \
-            ROCKCHIP_TPL=${rkbin}/rk3588_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin \
-            BL31=${rkbin}/rk3588_bl31_v1.40.elf
+            ROCKCHIP_TPL=${rkbin}/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.16.bin \
+            BL31=${rkbin}/rk3588_bl31_v1.45.elf
         '';
 
         installPhase = ''
           mkdir $out
           cp u-boot-rockchip.bin $out
-          cp ${rkbin}/rk3588_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin $out
-          cp ${rkbin}/rk3588_bl31_v1.40.elf $out
+          cp ${rkbin}/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.16.bin $out
+          cp ${rkbin}/rk3588_bl31_v1.45.elf $out
         '';
       };
 
