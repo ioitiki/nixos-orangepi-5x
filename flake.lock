@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "armbian-firmware": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1710010698,
+        "narHash": "sha256-DlRKCLOGW15FNfuzB/Ua2r1peMn/xHBuhOEv+e3VvTk=",
+        "owner": "armbian",
+        "repo": "firmware",
+        "rev": "6c1532bccd4f99608d7f09a0f115214a7867fb0a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "armbian",
+        "ref": "master",
+        "repo": "firmware",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -73,10 +90,29 @@
     },
     "root": {
       "inputs": {
+        "armbian-firmware": "armbian-firmware",
         "home-manager": "home-manager",
         "linux-rockchip": "linux-rockchip",
         "mesa-panfork": "mesa-panfork",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "ubuntu-rockchip-meta": "ubuntu-rockchip-meta"
+      }
+    },
+    "ubuntu-rockchip-meta": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1706644513,
+        "narHash": "sha256-8BhJAfHmBQC2lSGHOdWXIY1LEjDYhV4cRW4ua4JZKec=",
+        "owner": "Joshua-Riek",
+        "repo": "ubuntu-rockchip",
+        "rev": "a7922378ebe3f5d1068a84b70dbf6623a06bab1c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Joshua-Riek",
+        "ref": "v1.33",
+        "repo": "ubuntu-rockchip",
+        "type": "github"
       }
     }
   },

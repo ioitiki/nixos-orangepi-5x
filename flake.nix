@@ -1,4 +1,4 @@
-# vim: tabstop=2 expandtab autoindent
+# vim: tabstop=2 expandtab autoindent list
 {
   description = "NixOS Installer AArch64";
 
@@ -20,6 +20,17 @@
       url = "github:armbian/linux-rockchip/rk-5.10-rkr5.1";
       flake = false;
     };
+
+    ubuntu-rockchip-meta = {
+      url = "github:Joshua-Riek/ubuntu-rockchip/v1.33";
+      flake = false;
+    };
+
+    armbian-firmware = {
+      url = "github:armbian/firmware/master";
+      flake = false;
+    };
+
   };
 
   outputs = inputs@{ nixpkgs, home-manager, ... }:
@@ -75,6 +86,34 @@
         '';
       };
 
+      rk-valhal = pkgs.stdenv.mkDerivation rec {
+        pname = "rk-valhal";
+        version = "unstable";
+
+        buildInputs = with pkgs; [
+          autoPatchelfHook
+          xorg.libxcb
+          libdrm
+          xorg.libX11
+          stdenv.cc.cc.lib
+        ];
+
+        src = pkgs.fetchurl {
+          url = "https://github.com/tsukumijima/libmali-rockchip/raw/master/lib/aarch64-linux-gnu/libmali-valhall-g610-g6p0-x11-gbm.so";
+          sha256 = "sha256-PVfLdtyoUch2o/9xxJ/r1b/AD8FQH0btN98z5168uZs=";
+        };
+
+        unpackPhase = ''
+          :
+        '';
+        installPhase = ''
+          mkdir $out/lib -p
+          cp $src $out/lib/libmali.so.1
+          ln -s libmali.so.1 $out/lib/libmali-valhall-g610-g6p0-x11-gbm.so
+          for l in libEGL.so libEGL.so.1 libgbm.so.1 libGLESv2.so libGLESv2.so.2 libOpenCL.so.1; do ln -s libmali.so.1 $out/lib/$l; done
+        '';
+      };
+
       u-boot = pkgs.ccacheStdenv.mkDerivation rec {
         pname = "u-boot";
         version = "v2024.01";
@@ -127,6 +166,31 @@
         '';
       };
 
+      opi-5b-overlay = pkgs.stdenv.mkDerivation {
+        pname = "opi-5b-overlay";
+        version = "unstable";
+
+        src = inputs.ubuntu-rockchip-meta;
+
+        buildInputs = with pkgs; [
+          autoPatchelfHook
+        ];
+
+        configurePhase = ''
+          patchShebangs overlay
+        '';
+
+        installPhase = ''
+          mkdir $out
+          cp -rf overlay/* $out
+
+          # paths have to be corrected
+          sed -i 's|brcm_patchram_plus|'$out'/usr/bin/brcm_patchram_plus|g' $out/usr/lib/scripts/ap6275p-bluetooth.sh
+          sed -i 's|/lib/firmware|${inputs.armbian-firmware}|g' $out/usr/lib/scripts/ap6275p-bluetooth.sh
+          sed -i 's|rfkill|/run/current-system/sw/bin/rfkill|g' $out/usr/lib/scripts/ap6275p-bluetooth.sh
+        '';
+      };
+
       nixos-orangepi-5x = pkgs.stdenvNoCC.mkDerivation {
         pname = "nixos-orangepi-5x";
         version = "unstable";
@@ -171,9 +235,17 @@
                 src = inputs.mesa-panfork;
               })
             ).drivers;
+            extraPackages = [ rk-valhal ];
           };
 
-          firmware = [ (pkgs.callPackage ./board/firmware { }) ];
+          firmware = [
+            (pkgs.callPackage ./board/firmware { })
+
+            (pkgs.runCommandNoCC "build-firmware-drv" { } ''
+              mkdir -p $out/lib/firmware
+              cp -Rf ${inputs.armbian-firmware}/* $out/lib/firmware
+            '')
+          ];
 
           pulseaudio.enable = true;
         };
@@ -201,18 +273,27 @@
         environment.etc."u-boot".source = u-boot;
 
         environment.loginShellInit = ''
-          if [ -z "$DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
-            dunst&
+           # if [ -z "$DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
+           #   dunst&
 
-            # set default output to headphone
-            pacmd set-default-sink alsa_output.platform-es8388-sound.stereo-fallback &
+           #   # set default output to headphone
+           #   pacmd set-default-sink alsa_output.platform-es8388-sound.stereo-fallback &
 
-            # start the X
-            startx
-          fi
+           #   # start the X
+           #   # startx
+            if [ -z "$WAYLAND_DISPLAY" ] && [ "_$(tty)" == "_/dev/tty1" ]; then
+              export GDK_BACKEND=wayland
+              export MOZ_ENABLE_WAYLAND=1
+              export QT_QPA_PLATFORM=wayland
+              export XDG_SESSION_TYPE=wayland
 
-          alias e=nvim
-          alias rebuild='sudo nixos-rebuild switch --flake .'
+              dunst&
+
+              exec sway
+            fi
+
+            alias e=nvim
+            alias rebuild='sudo nixos-rebuild switch --flake .'
         '';
 
         time.timeZone = "Asia/Ho_Chi_Minh";
@@ -226,6 +307,12 @@
           videoDrivers = [ "modesetting" ];
           displayManager.startx.enable = true;
           windowManager.spectrwm.enable = true;
+          desktopManager = {
+            xterm.enable = false;
+            xfce = {
+              enable = true;
+            };
+          };
         };
 
         services.cockpit = {
@@ -258,6 +345,7 @@
         };
 
         programs = {
+          sway.enable = true;
           # starship.enable = true;
           neovim.enable = true;
           neovim.defaultEditor = true;
@@ -335,7 +423,7 @@
 
         modules = [
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
-          ({ pkgs, lib, ... }: {
+          ({ config, pkgs, lib, ... }: rec {
 
             boot = {
               loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
@@ -351,6 +439,11 @@
             # why not, we have 16GiB RAM
             fileSystems."/tmp" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=12G" ]; };
 
+            hardware.wirelessRegulatoryDatabase = true;
+            hardware.opengl.driSupport = true;
+            hardware.bluetooth.enable = true;
+            hardware.bluetooth.powerOnBoot = true;
+
             networking = {
               hostName = "singoc";
               networkmanager.enable = true;
@@ -362,6 +455,10 @@
               extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
               packages = with pkgs; [
                 home-manager
+
+                foot
+                wofi
+                waybar
 
                 neofetch
                 pavucontrol
@@ -377,6 +474,21 @@
             services.atftpd = {
               enable = true;
               root = "/tmp/tftpboot";
+            };
+
+            # systemd services
+            systemd.services = {
+              bluetooth-ap6275p = {
+                wantedBy = [ "multi-user.target" ];
+                after = [ "bluetooth.target" ];
+                description = "Bluetooth AP6275P";
+                serviceConfig = {
+                  Type = "forking";
+                  ExecStartPre = ''/run/current-system/sw/bin/sleep 5'';
+                  ExecStart = ''${opi-5b-overlay}/usr/lib/scripts/ap6275p-bluetooth.sh'';
+                  ExecStop = ''/run/current-system/sw/bin/pkill -9 brcm_patchram_plus'';
+                };
+              };
             };
           })
 
