@@ -364,6 +364,10 @@
                 networkmanager.enable = true;
               };
 
+              nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+                "sublimetext4"
+              ];
+
               time.timeZone = "America/Los_Angeles";
               i18n.defaultLocale = "en_US.UTF-8";
 
