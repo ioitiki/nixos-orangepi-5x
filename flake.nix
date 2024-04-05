@@ -296,7 +296,7 @@
             alias rebuild='sudo nixos-rebuild switch --flake .'
         '';
 
-        time.timeZone = "Asia/Ho_Chi_Minh";
+        time.timeZone = "America/Los_Angeles";
         i18n.defaultLocale = "en_US.UTF-8";
 
         services.sshd.enable = true;
@@ -376,8 +376,8 @@
             # some which is not available, force to not use any other.
             boot.initrd.availableKernelModules = lib.mkForce [ ];
 
-            users.users.nixos = {
-              initialPassword = "nixos";
+            users.users.andy = {
+              initialPassword = "andy";
               isNormalUser = true;
               extraGroups = [ "networkmanager" "wheel" ];
 
