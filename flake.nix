@@ -364,7 +364,7 @@
                 networkmanager.enable = true;
               };
 
-              time.timeZone = "Asia/Ho_Chi_Minh";
+              time.timeZone = "America/Los_Angeles";
               i18n.defaultLocale = "en_US.UTF-8";
 
               users.users.${user} = {
@@ -372,20 +372,19 @@
                 initialPassword = "${user}";
                 extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
                 packages = with pkgs; [
-		  home-manager
-
+		              home-manager
                   neofetch
                   pavucontrol
-		  direnv
-		  dunst
-		  firefox
-		  chromium
-		  qemu
+            		  direnv
+            		  dunst
+            		  firefox
+            		  chromium
+            		  qemu
                 ];
               };
 
-	      services.getty.autologinUser = "${user}";
-	      services.sshd.enable = true;
+      	      services.getty.autologinUser = "${user}";
+      	      services.sshd.enable = true;
 
               nix = {
                 settings = {
@@ -407,15 +406,16 @@
               };
             })
 
-	    home-manager.nixosModules.home-manager {
-	      home-manager.users.${user} = { pkgs, ... }: {
-	        home.packages = with pkgs; [ 
-	          ftop
-	        ];
-	        programs.bash.enable = true;
-	        home.stateVersion = "23.11";
-	     };
-	   }
+      	    home-manager.nixosModules.home-manager {
+      	      home-manager.users.${user} = { pkgs, ... }: {
+      	        home.packages = with pkgs; [ 
+      	          ftop
+                  sublime4
+      	        ];
+      	        programs.bash.enable = true;
+      	        home.stateVersion = "23.11";
+      	     };
+      	   }
         ];
       };
 
