@@ -40,6 +40,7 @@
           ];
 
           boot.initrd.includeDefaultModules = false; # no thanks, builtin modules should be enough
+          boot.initrd.availableKernelModules = lib.mkForce [ ];
 
           hardware = {
             deviceTree = { name = "rockchip/rk3588s-orangepi-5b.dtb"; };
@@ -73,7 +74,9 @@
 
           # Install Sublime Text 4
           environment.systemPackages = with pkgs; [
-            sublime4
+            firefox
+            chromium
+
             git
             htop
             neovim
