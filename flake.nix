@@ -16,11 +16,12 @@
     };
   };
 
-  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip, lib }: {
+  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip }: {
     nixosConfigurations.myConfig = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
+
       modules = [
-        ({ pkgs, ... }: {
+        ({ pkgs, lib, ... }: {
           # Set the system configuration
           boot.loader.grub.enable = false;
           boot.loader.generic-extlinux-compatible.enable = true;
@@ -37,6 +38,7 @@
             "console=tty1" # should be HDMI
             "loglevel=4" # more verbose might help
           ];
+
           boot.initrd.includeDefaultModules = false; # no thanks, builtin modules should be enough
 
           hardware = {
@@ -57,7 +59,6 @@
             };
 
             firmware = [ (pkgs.callPackage ./board/firmware { }) ];
-
             pulseaudio.enable = true;
           };
 
@@ -73,12 +74,10 @@
           # Install Sublime Text 4
           environment.systemPackages = with pkgs; [
             sublime4
-
             git
             htop
             neovim
             neofetch
-
             # only wayland can utily GPU as of now
             wayland
             waybar
