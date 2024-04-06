@@ -16,7 +16,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip }: {
+  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip, lib }: {
     nixosConfigurations.myConfig = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
       modules = [
