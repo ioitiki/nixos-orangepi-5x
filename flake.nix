@@ -3,7 +3,7 @@
 
   inputs = {
     # Use the same version of nixpkgs as the parent flake
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11-small";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
     mesa-panfork = {
       url = "gitlab:panfork/mesa/csf";
@@ -16,10 +16,9 @@
     };
   };
 
-  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip }: {
+  outputs = { self, nixpkgs, mesa-panfork, linux-rockchip, ... }: {
     nixosConfigurations.myConfig = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
-
       modules = [
         ({ pkgs, lib, ... }: {
           # Set the system configuration
