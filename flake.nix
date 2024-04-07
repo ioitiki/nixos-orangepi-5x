@@ -4,10 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
 
-    mesa-panfork = {
-      url = "gitlab:panfork/mesa/csf";
-      flake = false;
-    };
+    # mesa-panfork = {
+    #   url = "gitlab:panfork/mesa/csf";
+    #   flake = false;
+    # };
 
     linux-rockchip = {
       url = "github:armbian/linux-rockchip/rk-5.10-rkr5.1";
@@ -125,7 +125,12 @@
               }).overrideAttrs (_: {
                 pname = "mesa-panfork";
                 version = "23.0.0-panfork";
-                src = inputs.mesa-panfork;
+                src = pkgs.fetchFromGitLab {
+                  owner = "panfork";
+                  repo = "mesa";
+                  rev = "120202c675749c5ef81ae4c8cdc30019b4de08f4"; # branch: csf
+                  hash = "sha256-4eZHMiYS+sRDHNBtLZTA8ELZnLns7yT3USU5YQswxQ0=";
+                };
               })
             ).drivers;
           };
@@ -191,7 +196,7 @@
               fileSystems."/" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=8G" ]; };
               fileSystems."/boot" = { device = "/dev/disk/by-partlabel/Firmwares"; fsType = "vfat"; };
               fileSystems."/nix" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=nix,compress=zstd,noatime" ]; };
-              fileSystems."/home/${user}" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=usr,compress=zstd,noatime" ]; };
+              fileSystems."/home/andy" = { device = "/dev/mapper/Encrypted"; fsType = "btrfs"; options = [ "subvol=usr,compress=zstd,noatime" ]; };
 
               fileSystems."/tmp" = { device = "none"; fsType = "tmpfs"; options = [ "mode=0755,size=12G" ]; };
 
