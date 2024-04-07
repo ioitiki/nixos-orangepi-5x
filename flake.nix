@@ -180,7 +180,7 @@
     in
     rec
     {
-      # to install NixOS on eMMC
+      # to install NixOS on nvme
       nixosConfigurations.opi5 = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
         modules = [
@@ -240,15 +240,6 @@
         ];
       };
 
-      formatter.aarch64-linux = pkgs.nixpkgs-fmt;
-
-      packages.aarch64-linux.default = nixosConfigurations.live.config.system.build.sdImage;
-      packages.aarch64-linux.sdwriter = pkgs.writeScript "flash" ''
-        echo "= flash to sdcard (/dev/mmcblk1) if presented, requires sudo as well."
-        [ -e /dev/mmcblk1 ] && zstdcat result/sd-image/*.zst | \
-              sudo dd of=/dev/mmcblk1 bs=8M status=progress
-  [ -e /dev/mmcblk1 ] || echo "=  no sdcard found"
-      '';
-      apps.aarch64-linux.default = { type = "app"; program = "${packages.aarch64-linux.sdwriter}"; };
+      packages.aarch64-linux.opi5 = nixosConfigurations.opi5.config.system.build.toplevel;
     };
 }
