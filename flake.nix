@@ -190,11 +190,34 @@
               time.timeZone = "America/Los_Angeles";
               i18n.defaultLocale = "en_US.UTF-8";
 
+              nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+                # "1password"
+                # "1password-cli"
+                # "nvidia-x11"
+                # "nvidia-settings"
+                "vscode"
+                # "slack"
+                # "morgen"
+                # "ngrok"
+                # "android-studio-stable"
+                # "sublime-merge"
+                # "google-chrome"
+                # "sublimetext4"
+              ];
+
+              nixpkgs.config.permittedInsecurePackages = [
+                "electron-25.9.0"
+                "electron-24.8.6"
+                "openssl-1.1.1w"
+              ];
+
               users.users.andy = {
                 isNormalUser = true;
                 initialPassword = "andy";
                 extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
                 packages = with pkgs; [
+                  vscode
+                  chromium
                   neofetch
                   pavucontrol
                 ];
@@ -223,6 +246,6 @@
       };
 
       packages.aarch64-linux.opi5 = nixosConfigurations.opi5.config.system.build.toplevel;
-      packages.u-boot = u-boot;
+      # packages.u-boot = u-boot;
     };
 }
