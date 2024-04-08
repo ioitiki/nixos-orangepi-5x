@@ -47,11 +47,6 @@
           sha256 = "sha256-HPBjm/rIkfTCyAKCFvCqoK7oNN9e9rV9l32qLmI/qz4=";
         };
 
-        # u-boot for evb is not enable the sdmmc node, which cause issue as
-        # b-boot cannot detect sdcard to boot from
-        # the order of boot also need to swap, the eMMC mapped to mm0 (not same as Linux kernel)
-        # will then tell u-boot to load images from eMMC first instead of sdcard
-        # FIXME: this is strage cuz the order seem correct in Linux kernel
         patches = [ ./patches/u-boot/0001-sdmmc-enable.patch ];
 
         nativeBuildInputs = with pkgs; [
@@ -59,7 +54,6 @@
             setuptools
             pyelftools
           ]))
-
           swig
           ncurses
           gnumake
@@ -81,22 +75,10 @@
         '';
 
         installPhase = ''
-          mkdir $out
-          cp u-boot-rockchip.bin $out
+          mkdir -p /mnt/nix/boot
+          cp u-boot-rockchip.bin /mnt/nix/boot
         '';
       };
-
-      nixos-orangepi-5x = pkgs.stdenvNoCC.mkDerivation {
-        pname = "nixos-orangepi-5x";
-        version = "unstable";
-
-        src = ./.;
-
-        installPhase = ''
-          tar czf $out *
-        '';
-      };
-
 
       buildConfig = { pkgs, lib, ... }: {
         boot.kernelPackages = pkgs.linuxPackagesFor (pkgs.callPackage ./board/kernel {
@@ -241,5 +223,6 @@
       };
 
       packages.aarch64-linux.opi5 = nixosConfigurations.opi5.config.system.build.toplevel;
+      packages.u-boot = u-boot;
     };
 }
