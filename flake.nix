@@ -132,6 +132,7 @@
           htop
           neovim
           neofetch
+          direnv
 
           # only wayland can utily GPU as of now
           wayland
@@ -191,10 +192,6 @@
               i18n.defaultLocale = "en_US.UTF-8";
 
               nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-                # "1password"
-                # "1password-cli"
-                # "nvidia-x11"
-                # "nvidia-settings"
                 "vscode"
                 # "slack"
                 # "morgen"
@@ -220,6 +217,8 @@
                   chromium
                   neofetch
                   pavucontrol
+                  alacritty
+                  alacritty-theme
                 ];
               };
 
