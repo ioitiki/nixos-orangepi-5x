@@ -9,13 +9,18 @@
     #   flake = false;
     # };
 
+    home-manager = {
+      url = "github:nix-community/home-manager/release-23.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     linux-rockchip = {
       url = "github:armbian/linux-rockchip/rk-5.10-rkr5.1";
       flake = false;
     };
   };
 
-  outputs = inputs@{ nixpkgs, ... }:
+  outputs = inputs@{ nixpkgs, home-manager, ... }:
     let
       pkgs = import nixpkgs { system = "aarch64-linux"; };
       rkbin = pkgs.stdenvNoCC.mkDerivation {
@@ -137,6 +142,7 @@
           # only wayland can utily GPU as of now
           wayland
           waybar
+          wev
           swaylock
           swayidle
           foot
@@ -169,6 +175,9 @@
         modules = [
           (buildConfig { inherit pkgs; lib = nixpkgs.lib; })
           ({ pkgs, lib, ... }:
+            let
+              bunOverlay = import /home/andy/nixos-orangepi-5x/bun-overlay.nix;
+            in
             {
               boot = {
                 loader = { grub.enable = false; generic-extlinux-compatible.enable = true; };
@@ -191,6 +200,8 @@
               time.timeZone = "America/Los_Angeles";
               i18n.defaultLocale = "en_US.UTF-8";
 
+              nixpkgs.overlays = [ bunOverlay ];
+
               nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
                 "vscode"
                 # "slack"
@@ -199,7 +210,7 @@
                 # "android-studio-stable"
                 # "sublime-merge"
                 # "google-chrome"
-                # "sublimetext4"
+                "sublimetext4"
               ];
 
               nixpkgs.config.permittedInsecurePackages = [
@@ -214,13 +225,21 @@
                 extraGroups = [ "wheel" "networkmanager" "tty" "video" ];
                 packages = with pkgs; [
                   vscode
+                  sublime4
                   chromium
                   neofetch
                   pavucontrol
-                  alacritty
-                  alacritty-theme
+                  # slack
+                  gammu
+                  nodejs_18
+                  yarn
+                  bun
                 ];
               };
+
+              programs.zsh.enable = true;
+              users.defaultUserShell = pkgs.zsh;
+              environment.shells = with pkgs; [ zsh ];
 
               nix = {
                 settings = {
@@ -241,6 +260,80 @@
                 '';
               };
             })
+
+            home-manager.nixosModules.home-manager
+            {
+              home-manager.users.andy = { pkgs, ... }: {
+                home.username = "andy";
+                home.homeDirectory = "/home/andy";
+                home.packages = with pkgs; [
+                  alacritty
+
+                  roboto
+                  roboto-mono
+                  nerdfonts
+
+                  ftop
+                ];
+
+                programs.zsh = {
+                  enable = true;
+                  enableAutosuggestions = true;
+                  enableSyntaxHighlighting = true;
+
+                  shellAliases = {
+                    # zsh
+                    rezsh = "source ~/.zshrc";
+                    zshrc = "sublime ~/.zshrc";
+                    # sublime
+                    code = "sublime";
+                    s = "sublime";
+                    ".ssh" = "sublime ~/.ssh";
+                    verified-fans-graphql = "sublime ~/verified-fans/verified-fans-graphql";
+                    verified-fans-react = "sublime ~/verified-fans/verified-fans-react";
+                    # nixos
+                    clean = "nix-collect-garbage";
+                    config = "";
+                    update = "sudo nixos-rebuild switch --flake .#opi5 --impure";
+                    # git
+                    icm = "git add -A && git commit -m 'ic' && git push origin main";
+                    gcm = "git commit -m";
+                    sgit = "sudo git";
+                    # yarn
+                    yd = "yarn deploy";
+                    ydd = "yarn deploy round-five";
+                    ydp = "yarn deploy release";
+                    # bun
+                    b = "bun";
+                    bi = "bun install";
+                    bd = "bun run deploy";
+                    bunx = "bun x";
+                    buni = "bun run ./index.ts";
+                    bun-update = "sudo bash ~/.config/bun/update.sh";
+
+                    ".." = "cd ..";
+                    "myip" = "curl -4 icanhazip.com";
+                  };
+
+                  oh-my-zsh = {
+                    enable = true;
+                    custom = "$HOME/.config/oh-my-zsh/custom";
+                    plugins = [
+                      "git"
+                      "per-directory-history"
+                      "kubectl"
+                      "helm"
+                      "yarn"
+                    ];
+                    theme = "miRobbyRussle";
+                  };
+                };
+
+                home.stateVersion = "23.05";
+
+                programs.home-manager.enable = true;
+              };
+            }
         ];
       };
 
